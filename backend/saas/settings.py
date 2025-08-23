@@ -109,7 +109,7 @@ WSGI_APPLICATION = 'saas.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',  # ✅ must use tenant backend
+        'ENGINE': 'django_tenants.postgresql_backend',
         'NAME': 'saas_db',
         'USER': 'saas_user',
         'PASSWORD': 'saas1234',

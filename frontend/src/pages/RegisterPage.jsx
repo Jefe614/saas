@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
 import api from "../api/axios";
 
 export default function RegisterPage() {
-  const { companyDomain } = useParams(); // /:companyDomain/register or /register
   const [formData, setFormData] = useState({
+    name: "", // Changed from company_name to name
+    subdomain: "", // Added required subdomain field
     username: "",
     email: "",
     password: "",
-    company_name: companyDomain ? "" : "", // Only for admin creating new company
+    phone: "",
+    address: "",
+    role: "admin", // Default to admin for company registration
   });
   const [error, setError] = useState("");
 
@@ -24,42 +26,54 @@ export default function RegisterPage() {
     e.preventDefault();
 
     // Validate required fields
-    if (!formData.username || !formData.email || !formData.password) {
-      setError("Username, email, and password are required.");
+    if (!formData.name || !formData.subdomain || !formData.username || !formData.email || !formData.password) {
+      setError("Company name, subdomain, username, email, and password are required.");
       return;
     }
 
-    let payload = {
+    // Validate subdomain format (lowercase letters, numbers, hyphens only)
+    const subdomainRegex = /^[a-z0-9-]+$/;
+    if (!subdomainRegex.test(formData.subdomain)) {
+      setError("Subdomain must contain only lowercase letters, numbers, and hyphens.");
+      return;
+    }
+
+    // Validate password length
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    const payload = {
+      name: formData.name, // Changed from company_name
+      subdomain: formData.subdomain, // Added subdomain
       username: formData.username,
       email: formData.email,
       password: formData.password,
+      phone: formData.phone,
+      address: formData.address,
+      role: formData.role,
     };
 
-    if (companyDomain) {
-      // Customer registering under existing company
-      if (!companyDomain) {
-        setError("Company domain is required.");
-        return;
-      }
-      payload.company_domain = companyDomain;
-    } else {
-      // Admin creating new company
-      if (!formData.company_name) {
-        setError("Company name is required to create a new company.");
-        return;
-      }
-      payload.company_name = formData.company_name;
-    }
-
     try {
-      const res = await api.post("accounts/register/", payload); // Use api instance
-      alert("Registered successfully!");
+      // Updated URL to match your API endpoint
+      const res = await api.post("/api/companies/", payload);
+      alert("Company registered successfully!");
       console.log(res.data);
-      // Redirect or clear form on success (e.g., to login page)
-      setFormData({ username: "", email: "", password: "", company_name: "" });
+      // Redirect to login page or clear form
+      setFormData({
+        name: "",
+        subdomain: "",
+        username: "",
+        email: "",
+        password: "",
+        phone: "",
+        address: "",
+        role: "admin",
+      });
     } catch (err) {
       console.error(err.response?.data);
-      setError(err.response?.data?.error || "Error registering user");
+      setError(err.response?.data?.error || "Error registering company");
     }
   };
 
@@ -70,7 +84,7 @@ export default function RegisterPage() {
         className="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-md transform transition-all duration-300 hover:shadow-3xl"
       >
         <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
-          {companyDomain ? `Join ${companyDomain}` : "Create Your Company"}
+          Create Your Company
         </h2>
 
         {error && (
@@ -78,6 +92,33 @@ export default function RegisterPage() {
             {error}
           </div>
         )}
+
+        <div className="mb-4">
+          <input
+            type="text"
+            name="name"
+            placeholder="Company Name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
+          />
+        </div>
+
+        <div className="mb-4">
+          <input
+            type="text"
+            name="subdomain"
+            placeholder="Subdomain (e.g., mycompany)"
+            value={formData.subdomain}
+            onChange={handleChange}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Only lowercase letters, numbers, and hyphens allowed
+          </p>
+        </div>
 
         <div className="mb-4">
           <input
@@ -103,11 +144,11 @@ export default function RegisterPage() {
           />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4">
           <input
             type="password"
             name="password"
-            placeholder="Password"
+            placeholder="Password (min 8 characters)"
             value={formData.password}
             onChange={handleChange}
             required
@@ -115,25 +156,46 @@ export default function RegisterPage() {
           />
         </div>
 
-        {!companyDomain && (
-          <div className="mb-6">
-            <input
-              type="text"
-              name="company_name"
-              placeholder="Company Name"
-              value={formData.company_name}
-              onChange={handleChange}
-              required
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
-            />
-          </div>
-        )}
+        <div className="mb-4">
+          <input
+            type="text"
+            name="phone"
+            placeholder="Phone (optional)"
+            value={formData.phone}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
+          />
+        </div>
+
+        <div className="mb-6">
+          <input
+            type="text"
+            name="address"
+            placeholder="Address (optional)"
+            value={formData.address}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
+          />
+        </div>
+
+        {/* Optional: Include role selection if you want flexibility */}
+        {/* <div className="mb-6">
+          <select
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
+          >
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+          </select>
+        </div> */}
 
         <button
           type="submit"
           className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-200"
         >
-          {companyDomain ? "Register" : "Create Company"}
+          Create Company
         </button>
       </form>
     </div>
