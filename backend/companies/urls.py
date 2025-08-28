@@ -1,10 +1,16 @@
 from django.urls import path
-from .views import CompanyAPI
+from .views import CompanyAPI, CategoryAPIView, ProductAPIView
 
 urlpatterns = [
     # Company
     path("companies/", CompanyAPI.as_view(), name="company-list-create"),
     path("companies/<int:pk>/", CompanyAPI.as_view(), name="company-detail"),
+    path('api/products/', ProductAPIView.as_view(), name='products-list-create'),
+    path('api/products/<int:product_id>/', ProductAPIView.as_view(), name='product-detail-update-delete'),
+    
+    # Categories API endpoints  
+    path('api/categories/', CategoryAPIView.as_view(), name='categories-list-create'),
+    path('api/categories/<int:category_id>/', CategoryAPIView.as_view(), name='category-detail'),
 
     # # Customers
     # path("customers/", views.CustomerListCreateView.as_view(), name="customer-list-create"),

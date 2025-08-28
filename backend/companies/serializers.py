@@ -21,25 +21,55 @@ class StoreConfigSerializer(serializers.ModelSerializer):
             'cta_text', 'business_type', 'primary_color', 'about_text', 'theme'
         ]
 
-# Category Serializer
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ['id', 'name', 'image', 'description', 'product_count']
 
-# Product Serializer
+
+
 class ProductSerializer(serializers.ModelSerializer):
-    categories = CategorySerializer(many=True, read_only=True)
-    category_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), many=True, write_only=True, source='categories'
-    )
+    categories = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
+    originalPrice = serializers.SerializerMethodField()
+    priceValue = serializers.DecimalField(max_digits=10, decimal_places=2, source='price')
+    originalPriceValue = serializers.DecimalField(max_digits=10, decimal_places=2, source='original_price', allow_null=True)
+    badge = serializers.CharField(source='badge', allow_null=True)
+    badgeValue = serializers.CharField(source='badge', allow_null=True)
+    reviews = serializers.IntegerField(source='reviews_count')
+    inStock = serializers.BooleanField(source='is_available')
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'description', 'price', 'original_price', 'image',
-            'rating', 'reviews_count', 'is_available', 'badge', 'categories', 'category_ids'
+            'id', 'name', 'description', 'price', 'originalPrice', 'priceValue',
+            'originalPriceValue', 'image', 'rating', 'reviews', 'inStock',
+            'badge', 'badgeValue', 'categories', 'category'
         ]
+
+    def get_categories(self, obj):
+        return [cat.name for cat in obj.categories.all()]
+
+    def get_category(self, obj):
+        categories = [cat.name for cat in obj.categories.all()]
+        return categories[0] if categories else 'Uncategorized'
+
+    def get_price(self, obj):
+        return f'${obj.price:.2f}'
+
+    def get_originalPrice(self, obj):
+        return f'${obj.original_price:.2f}' if obj.original_price else None
+
+class CategorySerializer(serializers.ModelSerializer):
+    count = serializers.SerializerMethodField()
+    productCount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'image', 'description', 'count', 'productCount']
+
+    def get_count(self, obj):
+        return f'{obj.products.count()}+ products'
+
+    def get_productCount(self, obj):
+        return obj.products.count()
 
 # Customer Serializer
 class CustomerSerializer(serializers.ModelSerializer):
