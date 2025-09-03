@@ -8,9 +8,6 @@ from django.db import transaction
 import re
 from rest_framework.views import APIView
 
-Client = get_tenant_model()
-Domain = get_tenant_domain_model()
-
 class CompanyAPI(APIView):
     """
     ViewSet for registering a new company, creating a tenant, domain, store configuration, and admin user.

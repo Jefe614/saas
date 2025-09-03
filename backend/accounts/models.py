@@ -8,16 +8,6 @@ class CustomUser(AbstractUser):
         ("staff", "Staff"),
         ("client", "Client"),
     )
-
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="client")
-    company = models.ForeignKey(
-        "companies.Company",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="users"
-    )
-
     groups = models.ManyToManyField(
         'auth.Group',
         related_name='customuser_groups',

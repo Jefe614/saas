@@ -1,42 +1,28 @@
 from django.db import models
-from django_tenants.models import TenantMixin, DomainMixin
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.auth import get_user_model
 
-# Tenant Model (Public Schema)
-class Client(TenantMixin):
-    name = models.CharField(max_length=100)
+User = get_user_model()
+
+class BusinessProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='business_profile')
+    business_name = models.CharField(max_length=255)
+    business_email = models.EmailField(blank=True, null=True)
+    business_phone = models.CharField(max_length=20, blank=True, null=True)
+    business_address = models.TextField(blank=True, null=True)
     paid_until = models.DateField(null=True, blank=True)
     on_trial = models.BooleanField(default=True)
-    created_on = models.DateTimeField(auto_now_add=True)
-
-    auto_create_schema = True
-
-    def __str__(self):
-        return self.name
-
-# Domain Model (Public Schema)
-class Domain(DomainMixin):
-    pass
-
-# Company Model (Public Schema, for tenant metadata)
-class Company(models.Model):
-    client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='company_details', null=True, blank=True)
-    name = models.CharField(max_length=255)
-    email = models.EmailField(blank=True, null=True)
-    phone = models.CharField(max_length=20, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.business_name} ({self.user.username})"
 
     class Meta:
-        db_table = 'public_company'
+        db_table = 'business_profile'
 
-# Store Configuration Model (Tenant-specific, in tenant schema)
+
 class StoreConfig(models.Model):
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='store_configs', null=True, blank=True)
-    client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='store_config')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='store_config')
     store_name = models.CharField(max_length=255, default='My Store')
     tagline = models.CharField(max_length=255, blank=True, null=True)
     hero_title = models.CharField(max_length=255, blank=True, null=True)
@@ -65,26 +51,30 @@ class StoreConfig(models.Model):
     )
 
     def __str__(self):
-        return f"{self.store_name} Config"
+        return f"{self.store_name} ({self.user.username})"
 
     class Meta:
         db_table = 'store_config'
 
-# Category Model (Tenant-specific)
+# Category Model (linked to User)
 class Category(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categories')
     name = models.CharField(max_length=255)
     image = models.URLField(max_length=500, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     product_count = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.user.username})"
 
     class Meta:
         db_table = 'category'
+        verbose_name_plural = 'Categories'
+        unique_together = ('user', 'name')  # Unique category names per user
 
-# Product Model (Tenant-specific)
+# Product Model (linked to User)
 class Product(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -109,26 +99,30 @@ class Product(models.Model):
     categories = models.ManyToManyField(Category, related_name='products')
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.user.username})"
 
     class Meta:
         db_table = 'product'
 
-# Customer Model (Tenant-specific)
+# Customer Model (linked to User)
 class Customer(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='customers')
     name = models.CharField(max_length=255)
-    email = models.EmailField(unique=True, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.user.username})"
 
     class Meta:
         db_table = 'customer'
+        # Ensure email uniqueness per user, not globally
+        unique_together = ('user', 'email')
 
-# Order Model (Tenant-specific)
+# Order Model (linked to User through Customer)
 class Order(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='orders')
     created_at = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -139,7 +133,7 @@ class Order(models.Model):
     )
 
     def __str__(self):
-        return f"Order {self.id}"
+        return f"Order {self.id} ({self.user.username})"
 
     class Meta:
         db_table = 'order'
@@ -156,7 +150,7 @@ class OrderItem(models.Model):
     class Meta:
         db_table = 'order_item'
 
-# Payment Model (Tenant-specific)
+# Payment Model (linked to User through Order)
 class Payment(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
