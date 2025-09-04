@@ -35,3 +35,8 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.role})"
+
+    class Meta:
+        app_label = "accounts"
+        verbose_name = "User"
+        verbose_name_plural = "Users"

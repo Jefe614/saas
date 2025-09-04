@@ -82,7 +82,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'middleware.tenant_middleware.TenantMiddleware',
+    # 'middleware.tenant_middleware.TenantMiddleware',
+    'django_tenants.middleware.main.TenantMainMiddleware', 
 ]
 
 ROOT_URLCONF = 'saas.urls'
@@ -177,8 +178,6 @@ DATABASE_ROUTERS = (
     'django_tenants.routers.TenantSyncRouter',
 )
 
-TENANT_MODEL = "companies.Client"
-TENANT_DOMAIN_MODEL = "companies.Domain"
 
 
 CORS_ALLOWED_ORIGINS = [
@@ -187,3 +186,4 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
+APPEND_SLASH = True

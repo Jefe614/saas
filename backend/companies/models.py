@@ -1,6 +1,8 @@
 from django.db import models
 from django_tenants.models import TenantMixin, DomainMixin
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.management import call_command
+
 
 # Tenant Model (Public Schema)
 class Client(TenantMixin):
@@ -13,6 +15,12 @@ class Client(TenantMixin):
 
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new:
+            call_command("migrate_schemas", schema_name=self.schema_name, interactive=False)
 
 # Domain Model (Public Schema)
 class Domain(DomainMixin):
@@ -26,6 +34,7 @@ class Company(models.Model):
     phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    subdomain = models.CharField(max_length=100, unique=True, null=True, blank=True) 
 
     def __str__(self):
         return self.name
