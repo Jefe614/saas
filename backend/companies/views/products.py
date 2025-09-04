@@ -2,6 +2,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from decimal import Decimal
@@ -13,35 +14,31 @@ logger = logging.getLogger(__name__)
 
 class ProductAPIView(APIView):
     """API for products management"""
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Get all products for the tenant"""
+        """Get all products for the user"""
         try:
-            # Check if company is set
-            if not hasattr(request, 'company'):
-                logger.error("No company set on request")
-                return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            company = request.company
-            logger.debug(f"Fetching products for company: {company.name}")
+            user = request.user
+            logger.debug(f"Fetching products for user: {user.username}")
 
             # Get store config for additional metadata
             try:
-                store_config = StoreConfig.objects.get(client=company.client)
+                store_config = StoreConfig.objects.get(user=user)
                 store_name = store_config.store_name
             except StoreConfig.DoesNotExist:
-                store_name = company.name
-                logger.warning(f"No StoreConfig found for company: {company.name}")
+                store_name = "My Store"
+                logger.warning(f"No StoreConfig found for user: {user.username}")
 
-            products = Product.objects.all().order_by('-id')
+            products = Product.objects.filter(user=user).order_by('-id')
             serializer = ProductSerializer(products, many=True)
 
             return Response({
                 'products': serializer.data,
                 'total': len(serializer.data),
-                'company': {
-                    'name': company.name,
-                    'store_name': store_name
+                'store': {
+                    'name': store_name,
+                    'owner': user.username
                 }
             }, status=status.HTTP_200_OK)
 
@@ -52,12 +49,8 @@ class ProductAPIView(APIView):
     def post(self, request):
         """Create a new product"""
         try:
-            if not hasattr(request, 'company'):
-                logger.error("No company set on request")
-                return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            company = request.company
-            logger.debug(f"Creating product for company: {company.name}")
+            user = request.user
+            logger.debug(f"Creating product for user: {user.username}")
 
             data = request.data
 
@@ -130,6 +123,7 @@ class ProductAPIView(APIView):
 
             # Create product
             product = Product.objects.create(
+                user=user,
                 name=data.get('name', ''),
                 description=data.get('description', ''),
                 price=price,
@@ -150,16 +144,17 @@ class ProductAPIView(APIView):
                 if not cat_name:
                     continue
                 category, created = Category.objects.get_or_create(
+                    user=user,
                     name=cat_name,
                     defaults={'description': f'{cat_name} products'}
                 )
                 product.categories.add(category)
 
-            logger.info(f"Created product {product.id} for company: {company.name}")
+            logger.info(f"Created product {product.id} for user: {user.username}")
             return Response({
                 'message': 'Product created successfully',
                 'product_id': product.id,
-                'company': company.name
+                'user': user.username
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -172,14 +167,10 @@ class ProductAPIView(APIView):
             return Response({'error': 'Product ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            if not hasattr(request, 'company'):
-                logger.error("No company set on request")
-                return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+            user = request.user
+            logger.debug(f"Updating product {product_id} for user: {user.username}")
 
-            company = request.company
-            logger.debug(f"Updating product {product_id} for company: {company.name}")
-
-            product = Product.objects.get(id=product_id)
+            product = Product.objects.get(id=product_id, user=user)
             data = request.data
 
             # Update fields with validation
@@ -276,19 +267,20 @@ class ProductAPIView(APIView):
                     if not cat_name:
                         continue
                     category, created = Category.objects.get_or_create(
+                        user=user,
                         name=cat_name,
                         defaults={'description': f'{cat_name} products'}
                     )
                     product.categories.add(category)
 
-            logger.info(f"Updated product {product_id} for company: {company.name}")
+            logger.info(f"Updated product {product_id} for user: {user.username}")
             return Response({
                 'message': 'Product updated successfully',
-                'company': company.name
+                'user': user.username
             }, status=status.HTTP_200_OK)
 
         except Product.DoesNotExist:
-            logger.error(f"Product {product_id} not found for company: {company.name}")
+            logger.error(f"Product {product_id} not found for user: {user.username}")
             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Error updating product {product_id}: {str(e)}")
@@ -300,23 +292,19 @@ class ProductAPIView(APIView):
             return Response({'error': 'Product ID required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            if not hasattr(request, 'company'):
-                logger.error("No company set on request")
-                return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
+            user = request.user
+            logger.debug(f"Deleting product {product_id} for user: {user.username}")
 
-            company = request.company
-            logger.debug(f"Deleting product {product_id} for company: {company.name}")
-
-            product = Product.objects.get(id=product_id)
+            product = Product.objects.get(id=product_id, user=user)
             product.delete()
-            logger.info(f"Deleted product {product_id} for company: {company.name}")
+            logger.info(f"Deleted product {product_id} for user: {user.username}")
             return Response({
                 'message': 'Product deleted successfully',
-                'company': company.name
+                'user': user.username
             }, status=status.HTTP_200_OK)
 
         except Product.DoesNotExist:
-            logger.error(f"Product {product_id} not found for company: {company.name}")
+            logger.error(f"Product {product_id} not found for user: {user.username}")
             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Error deleting product {product_id}: {str(e)}")
@@ -325,35 +313,31 @@ class ProductAPIView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class CategoryAPIView(APIView):
     """API for categories management"""
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Get all categories for the tenant"""
+        """Get all categories for the user"""
         try:
-            # Check if company is set
-            if not hasattr(request, 'company'):
-                logger.error("No company set on request")
-                return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            company = request.company
-            logger.debug(f"Fetching categories for company: {company.name}")
+            user = request.user
+            logger.debug(f"Fetching categories for user: {user.username}")
 
             # Get store config for additional metadata
             try:
-                store_config = StoreConfig.objects.get(client=company.client)
+                store_config = StoreConfig.objects.get(user=user)
                 store_name = store_config.store_name
             except StoreConfig.DoesNotExist:
-                store_name = company.name
-                logger.warning(f"No StoreConfig found for company: {company.name}")
+                store_name = "My Store"
+                logger.warning(f"No StoreConfig found for user: {user.username}")
 
-            categories = Category.objects.all().order_by('name')
+            categories = Category.objects.filter(user=user).order_by('name')
             serializer = CategorySerializer(categories, many=True)
 
             return Response({
                 'categories': serializer.data,
                 'total': len(serializer.data),
-                'company': {
-                    'name': company.name,
-                    'store_name': store_name
+                'store': {
+                    'name': store_name,
+                    'owner': user.username
                 }
             }, status=status.HTTP_200_OK)
 
@@ -364,12 +348,8 @@ class CategoryAPIView(APIView):
     def post(self, request):
         """Create a new category"""
         try:
-            if not hasattr(request, 'company'):
-                logger.error("No company set on request")
-                return Response({'error': 'Company not found'}, status=status.HTTP_404_NOT_FOUND)
-
-            company = request.company
-            logger.debug(f"Creating category for company: {company.name}")
+            user = request.user
+            logger.debug(f"Creating category for user: {user.username}")
 
             data = request.data
 
@@ -380,20 +360,95 @@ class CategoryAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Check if category already exists for this user
+            if Category.objects.filter(user=user, name=data['name']).exists():
+                return Response(
+                    {'error': 'Category with this name already exists'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             # Create category
             category = Category.objects.create(
+                user=user,
                 name=data['name'],
                 description=data.get('description', ''),
                 image=data.get('image', '')
             )
 
-            logger.info(f"Created category {category.id} for company: {company.name}")
+            logger.info(f"Created category {category.id} for user: {user.username}")
             return Response({
                 'message': 'Category created successfully',
                 'category_id': category.id,
-                'company': company.name
+                'user': user.username
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             logger.error(f"Error creating category: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, category_id=None):
+        """Update a category"""
+        if not category_id:
+            return Response({'error': 'Category ID required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = request.user
+            logger.debug(f"Updating category {category_id} for user: {user.username}")
+
+            category = Category.objects.get(id=category_id, user=user)
+            data = request.data
+
+            # Update fields with validation
+            if 'name' in data and data['name'] is not None:
+                if data['name'] == '':
+                    return Response(
+                        {'error': 'Name cannot be empty'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                # Check if another category with this name exists
+                if Category.objects.filter(user=user, name=data['name']).exclude(id=category_id).exists():
+                    return Response(
+                        {'error': 'Category with this name already exists'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                category.name = data['name']
+
+            if 'description' in data:
+                category.description = data['description'] or ''
+
+            if 'image' in data:
+                category.image = data['image'] or ''
+
+            category.save()
+
+            logger.info(f"Updated category {category_id} for user: {user.username}")
+            return Response({
+                'message': 'Category updated successfully',
+                'user': user.username
+            }, status=status.HTTP_200_OK)
+
+        except Category.DoesNotExist:
+            logger.error(f"Category {category_id} not found for user: {user.username}")
+            return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error updating category {category_id}: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, category_id=None):
+        """Delete a category"""
+        if not category_id:
+            return Response({'error': 'Category ID required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = request.user
+            category = Category.objects.get(id=category_id, user=user)
+            category.delete()
+            return Response({
+                'message': 'Category deleted successfully',
+                'user': user.username
+            }, status=status.HTTP_200_OK)
+
+        except Category.DoesNotExist:
+            return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
