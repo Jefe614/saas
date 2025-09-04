@@ -30,48 +30,19 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
-# INSTALLED_APPS = [
-#     'django.contrib.admin',
-#     'django.contrib.auth',
-#     'django.contrib.contenttypes',
-#     'django.contrib.sessions',
-#     'django.contrib.messages',
-#     'django.contrib.staticfiles',
-#     'accounts',
-#     'rest_framework',
-#     'corsheaders',
-#     'companies',
-#     'rest_framework.authtoken', 
-#     'django_tenants'
-# ]
-
-SHARED_APPS = (
-    'django_tenants',
-    'companies',
-    'django.contrib.contenttypes',
-    'django.contrib.auth',
-    'django.contrib.sessions',
+INSTALLED_APPS = [
     'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'accounts',
+    'companies',
     'rest_framework',
-    'corsheaders',
-)
-
-TENANT_APPS = (
     'rest_framework.authtoken',
-)
-
-INSTALLED_APPS = list(SHARED_APPS) + list(TENANT_APPS)
-
-DATABASE_ROUTERS = (
-    'django_tenants.routers.TenantSyncRouter',
-)
-
-TENANT_MODEL = "companies.Client"
-TENANT_DOMAIN_MODEL = "companies.Domain"
-
+    'corsheaders',
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -82,8 +53,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'middleware.tenant_middleware.TenantMiddleware',
-    'django_tenants.middleware.main.TenantMainMiddleware', 
 ]
 
 ROOT_URLCONF = 'saas.urls'
@@ -95,6 +64,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -111,7 +81,7 @@ WSGI_APPLICATION = 'saas.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'saas_db',
         'USER': 'saas_user',
         'PASSWORD': 'saas1234',
@@ -119,8 +89,6 @@ DATABASES = {
         'PORT': '5432',
     }
 }
-
-
 
 
 # Password validation
@@ -172,12 +140,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
 }
-
-DATABASE_ROUTERS = (
-    'django_tenants.routers.TenantSyncRouter',
-)
-
 
 
 CORS_ALLOWED_ORIGINS = [
@@ -186,4 +153,3 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
-APPEND_SLASH = True
