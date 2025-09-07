@@ -1,17 +1,6 @@
 from rest_framework import serializers
-from .models import StoreConfig, Category, Product, Customer, Order, OrderItem, Payment, Company
+from .models import StoreConfig, Category, Product, Customer, Order, OrderItem, Payment
 
-# Company Serializer (Public Schema)
-class CompanySerializer(serializers.ModelSerializer):
-    subdomain = serializers.CharField(write_only=True)
-    username = serializers.CharField(write_only=True)
-    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    role = serializers.ChoiceField(choices=['admin', 'staff', 'client'], write_only=True, default='admin')
-
-    class Meta:
-        model = Company
-        fields = ['id', 'name', 'email', 'phone', 'address', 'created_at', 'subdomain', 'username', 'password', 'role']
-        read_only_fields = ['id', 'created_at']
 # StoreConfig Serializer
 class StoreConfigSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,21 +16,14 @@ class StoreConfigSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     categories = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
-    price = serializers.SerializerMethodField()
-    originalPrice = serializers.SerializerMethodField()
-    priceValue = serializers.DecimalField(max_digits=10, decimal_places=2, source='price')
-    originalPriceValue = serializers.DecimalField(max_digits=10, decimal_places=2, source='original_price', allow_null=True)
-    badge = serializers.CharField(source='badge', allow_null=True)
-    badgeValue = serializers.CharField(source='badge', allow_null=True)
-    reviews = serializers.IntegerField(source='reviews_count')
-    inStock = serializers.BooleanField(source='is_available')
+    
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'description', 'price', 'originalPrice', 'priceValue',
-            'originalPriceValue', 'image', 'rating', 'reviews', 'inStock',
-            'badge', 'badgeValue', 'categories', 'category'
+            'id', 'name', 'description', 'price',
+            'image', 'rating', 'reviews_count', 'is_available',
+            'badge', 'categories', 'category'
         ]
 
     def get_categories(self, obj):
@@ -51,11 +33,6 @@ class ProductSerializer(serializers.ModelSerializer):
         categories = [cat.name for cat in obj.categories.all()]
         return categories[0] if categories else 'Uncategorized'
 
-    def get_price(self, obj):
-        return f'${obj.price:.2f}'
-
-    def get_originalPrice(self, obj):
-        return f'${obj.original_price:.2f}' if obj.original_price else None
 
 class CategorySerializer(serializers.ModelSerializer):
     count = serializers.SerializerMethodField()

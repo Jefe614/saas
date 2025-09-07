@@ -1,6 +1,7 @@
 // src/components/ProductsContent.js
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit3, Trash2 } from 'lucide-react';
+import { message, Modal, Spin } from 'antd';
 import ProductModal from './Modals/ProductModal';
 import api from '../../api/axios';
 
@@ -9,8 +10,8 @@ const ProductsContent = ({ isDarkMode }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
 
   // Fetch products on mount
   useEffect(() => {
@@ -19,9 +20,8 @@ const ProductsContent = ({ isDarkMode }) => {
       try {
         const response = await api.get('/api/products/');
         setProducts(response.data.products);
-        setError(null);
       } catch (err) {
-        setError(err.response?.data?.error || 'Failed to fetch products');
+        message.error(err.response?.data?.error || 'Failed to fetch products');
       } finally {
         setLoading(false);
       }
@@ -32,8 +32,6 @@ const ProductsContent = ({ isDarkMode }) => {
   // Handle adding or editing a product
   const handleSaveProduct = async (formData, productId) => {
     setLoading(true);
-    setError(null);
-    setSuccess(null);
     try {
       if (productId) {
         // Edit product
@@ -41,7 +39,7 @@ const ProductsContent = ({ isDarkMode }) => {
         setProducts((prev) =>
           prev.map((p) => (p.id === productId ? { ...p, ...formData } : p))
         );
-        setSuccess(response.data.message);
+        message.success(response.data.message || 'Product updated successfully');
       } else {
         // Add product
         const response = await api.post('/api/products/', formData);
@@ -49,29 +47,37 @@ const ProductsContent = ({ isDarkMode }) => {
           ...prev,
           { id: response.data.product_id, ...formData },
         ]);
-        setSuccess(response.data.message);
+        message.success(response.data.message || 'Product created successfully');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save product');
+      message.error(err.response?.data?.error || 'Failed to save product');
     } finally {
       setLoading(false);
+      setIsModalOpen(false);
     }
   };
 
+  // Handle delete confirmation
+  const showDeleteConfirm = (product) => {
+    setProductToDelete(product);
+    setDeleteModalVisible(true);
+  };
+
   // Handle deleting a product
-  const handleDeleteProduct = async (productId) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    
     setLoading(true);
-    setError(null);
-    setSuccess(null);
     try {
-      const response = await api.delete(`/api/products/${productId}/`);
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
-      setSuccess(response.data.message);
+      const response = await api.delete(`/api/products/${productToDelete.id}/`);
+      setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
+      message.success(response.data.message || 'Product deleted successfully');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to delete product');
+      message.error(err.response?.data?.error || 'Failed to delete product');
     } finally {
       setLoading(false);
+      setDeleteModalVisible(false);
+      setProductToDelete(null);
     }
   };
 
@@ -93,6 +99,12 @@ const ProductsContent = ({ isDarkMode }) => {
     setSelectedProduct(null);
   };
 
+  // Close delete modal
+  const handleCloseDeleteModal = () => {
+    setDeleteModalVisible(false);
+    setProductToDelete(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -107,10 +119,12 @@ const ProductsContent = ({ isDarkMode }) => {
         </button>
       </div>
 
-      {/* Feedback Messages */}
-      {loading && <p className="text-blue-600">Loading...</p>}
-      {error && <p className="text-red-600">{error}</p>}
-      {success && <p className="text-green-600">{success}</p>}
+      {/* Loading Spinner */}
+      {loading && (
+        <div className="flex justify-center">
+          <Spin size="large" />
+        </div>
+      )}
 
       {/* Products Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
@@ -141,18 +155,18 @@ const ProductsContent = ({ isDarkMode }) => {
                     </div>
                   </td>
                   <td className="py-4 px-4">{product.categories?.join(', ') || 'N/A'}</td>
-                  <td className="py-4 px-4">${product.price}</td>
+                  <td className="py-4 px-4">{product.price}</td>
                   <td className="py-4 px-4">{product.inStock ? 'In Stock' : 'Out of Stock'}</td>
                   <td className="py-4 px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
-                        product.is_available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        product.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {product.is_available ? 'Active' : 'Out of Stock'}
+                      {product.inStock ? 'Active' : 'Out of Stock'}
                     </span>
                   </td>
-                  <td className="py-4 px-4">{product.reviews_count || 0}</td>
+                  <td className="py-4 px-4">{product.reviews || 0}</td>
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-2">
                       <button
@@ -162,7 +176,7 @@ const ProductsContent = ({ isDarkMode }) => {
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteProduct(product.id)}
+                        onClick={() => showDeleteConfirm(product)}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-red-600"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -183,7 +197,23 @@ const ProductsContent = ({ isDarkMode }) => {
         onSubmit={handleSaveProduct}
         product={selectedProduct}
         isDarkMode={isDarkMode}
+        loading={loading}
       />
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        title="Confirm Delete"
+        open={deleteModalVisible}
+        onOk={handleDeleteProduct}
+        onCancel={handleCloseDeleteModal}
+        okText="Delete"
+        okType="danger"
+        cancelText="Cancel"
+        confirmLoading={loading}
+      >
+        <p>Are you sure you want to delete "{productToDelete?.name}"?</p>
+        <p className="text-red-600">This action cannot be undone.</p>
+      </Modal>
     </div>
   );
 };

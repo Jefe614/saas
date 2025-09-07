@@ -1,4 +1,5 @@
 # views.py
+from companies.permissions import IsAdminUser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ProductAPIView(APIView):
     """API for products management"""
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAdminUser]
 
     def get(self, request):
         """Get all products for the user"""

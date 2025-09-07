@@ -1,8 +1,7 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 
-User = get_user_model()
 
 class BusinessProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='business_profile')

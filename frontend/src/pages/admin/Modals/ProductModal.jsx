@@ -1,6 +1,6 @@
 // src/components/ProductModal.js
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Checkbox, Button, Upload, Select, Row, Col, message } from 'antd';
+import { Modal, Form, Input, InputNumber, Checkbox, Button, Upload, Select, Row, Col, message, Spin } from 'antd';
 import { SaveOutlined, UploadOutlined } from '@ant-design/icons';
 import axios from 'axios';
 
@@ -13,28 +13,35 @@ const badgeOptions = [
   { label: 'Out of Stock', value: 'out_of_stock' },
 ];
 
-const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode }) => {
+const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode, loading }) => {
   const isEditMode = !!product;
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState([]);
   const [categories, setCategories] = useState([]);
-  console.log('isDarkMode in ProductModal:', isDarkMode);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   // Load categories from API
   useEffect(() => {
-    axios
-      .get('/api/categories/') // Adjust endpoint if needed
-      .then((res) => {
-        const categoryData = res.data.map((cat) => ({
+    const fetchCategories = async () => {
+      setCategoriesLoading(true);
+      try {
+        const response = await axios.get('/api/categories/');
+        const categoryData = response.data.map((cat) => ({
           label: cat.name,
-          value: cat.id,
+          value: cat.name,
         }));
         setCategories(categoryData);
-      })
-      .catch(() => {
+      } catch (error) {
         message.error('Failed to load categories');
-      });
-  }, []);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchCategories();
+    }
+  }, [isOpen]);
 
   // Pre-fill form for edit mode
   useEffect(() => {
@@ -42,13 +49,13 @@ const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode }) => {
       form.setFieldsValue({
         name: product.name || '',
         description: product.description || '',
-        price: product.price || '',
-        originalPrice: product.original_price || '',
+        price: product.priceValue || '',
+        originalPrice: product.originalPriceValue || '',
         rating: product.rating || 0,
-        reviews: product.reviews_count || 0,
-        inStock: product.is_available !== undefined ? product.is_available : true,
-        badge: product.badge || null,
-        categories: product.categories ? product.categories.map((c) => c.id) : [],
+        reviews: product.reviews || 0,
+        inStock: product.inStock !== undefined ? product.inStock : true,
+        badge: product.badgeValue || null,
+        categories: product.categories || [],
       });
 
       // Preload image in Upload
@@ -66,20 +73,28 @@ const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode }) => {
       form.resetFields();
       setFileList([]);
     }
-  }, [product, isEditMode, form]);
+  }, [product, isEditMode, form, isOpen]);
 
   const handleSubmit = (values) => {
     const imageUrl = fileList[0]?.url || fileList[0]?.response?.url || '';
     const formData = {
       ...values,
       image: imageUrl,
+      categories: values.categories || [],
     };
     onSubmit(formData, isEditMode ? product.id : null);
-    onClose();
   };
 
   const handleImageChange = ({ fileList: newFileList }) => {
     setFileList(newFileList);
+  };
+
+  const beforeUpload = (file) => {
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error('Image must be smaller than 2MB!');
+    }
+    return isLt2M;
   };
 
   return (
@@ -90,163 +105,149 @@ const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode }) => {
       footer={null}
       destroyOnClose
       width={800}
-      className={isDarkMode ? 'ant-modal-dark' : ''} // Custom class for dark mode
+      className={isDarkMode ? 'ant-modal-dark' : ''}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleSubmit}
-        initialValues={{
-          name: '',
-          description: '',
-          price: '',
-          originalPrice: '',
-          rating: 0,
-          reviews: 0,
-          inStock: true,
-          badge: null,
-          categories: [],
-        }}
-        className={isDarkMode ? 'dark' : ''} // Apply dark mode class to form
-      >
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="name"
-              label="Name"
-              rules={[{ required: true, message: 'Please enter the product name' }]}
-            >
-              <Input
-                placeholder="Enter product name"
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="price"
-              label="Price"
-              rules={[{ required: true, message: 'Please enter the price' }]}
-            >
-              <InputNumber
-                min={0}
-                step={0.01}
-                placeholder="Enter price"
-                style={{ width: '100%' }}
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-
-            <Form.Item name="originalPrice" label="Original Price">
-              <InputNumber
-                min={0}
-                step={0.01}
-                placeholder="Enter original price"
-                style={{ width: '100%' }}
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item name="rating" label="Rating (0-5)">
-              <InputNumber
-                min={0}
-                max={5}
-                step={0.1}
-                style={{ width: '100%' }}
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-
-            <Form.Item name="reviews" label="Reviews Count">
-              <InputNumber
-                min={0}
-                style={{ width: '100%' }}
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item name="badge" label="Badge">
-              <Select
-                placeholder="Select badge"
-                allowClear
-                options={badgeOptions}
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item name="categories" label="Categories">
-              <Select
-                mode="multiple"
-                placeholder="Select categories"
-                options={categories}
-                allowClear
-                className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-              />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item name="inStock" valuePropName="checked">
-              <Checkbox className={isDarkMode ? 'dark:text-white' : ''}>In Stock</Checkbox>
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item label="Image">
-              <Upload
-                listType="picture"
-                fileList={fileList}
-                onChange={handleImageChange}
-                beforeUpload={() => false} // Prevent auto-upload
-                className={isDarkMode ? 'dark:text-white' : ''}
+      <Spin spinning={categoriesLoading}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            name: '',
+            description: '',
+            price: '',
+            originalPrice: '',
+            rating: 0,
+            reviews: 0,
+            inStock: true,
+            badge: null,
+            categories: [],
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="name"
+                label="Name"
+                rules={[{ required: true, message: 'Please enter the product name' }]}
               >
-                <Button
-                  icon={<UploadOutlined />}
-                  className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
+                <Input placeholder="Enter product name" />
+              </Form.Item>
+
+              <Form.Item
+                name="price"
+                label="Price"
+                rules={[{ required: true, message: 'Please enter the price' }]}
+              >
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  placeholder="Enter price"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item name="originalPrice" label="Original Price">
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  placeholder="Enter original price"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item name="rating" label="Rating (0-5)">
+                <InputNumber
+                  min={0}
+                  max={5}
+                  step={0.1}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item name="reviews" label="Reviews Count">
+                <InputNumber
+                  min={0}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="badge" label="Badge">
+                <Select
+                  placeholder="Select badge"
+                  allowClear
+                  options={badgeOptions}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item name="categories" label="Categories">
+                <Select
+                  mode="multiple"
+                  placeholder="Select categories"
+                  options={categories}
+                  allowClear
+                  loading={categoriesLoading}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="inStock" valuePropName="checked">
+                <Checkbox>In Stock</Checkbox>
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <Form.Item label="Image">
+                <Upload
+                  listType="picture"
+                  fileList={fileList}
+                  onChange={handleImageChange}
+                  // beforeUpload={beforeUpload}
+                  maxCount={1}
                 >
-                  Upload Image
-                </Button>
-              </Upload>
-            </Form.Item>
-          </Col>
-        </Row>
+                  <Button icon={<UploadOutlined />}>
+                    Upload Image
+                  </Button>
+                </Upload>
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <Form.Item name="description" label="Description">
-          <Input.TextArea
-            rows={3}
-            placeholder="Enter product description"
-            className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-          />
-        </Form.Item>
+          <Form.Item name="description" label="Description">
+            <Input.TextArea
+              rows={3}
+              placeholder="Enter product description"
+            />
+          </Form.Item>
 
-        <Form.Item>
-          <div className="flex justify-end space-x-2">
-            <Button
-              onClick={onClose}
-              className={isDarkMode ? 'dark:bg-gray-700 dark:border-gray-600 dark:text-white' : ''}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              icon={<SaveOutlined />}
-              className={isDarkMode ? 'dark:bg-blue-600 dark:text-white' : ''}
-            >
-              Save
-            </Button>
-          </div>
-        </Form.Item>
-      </Form>
+          <Form.Item>
+            <div className="flex justify-end space-x-2">
+              <Button onClick={onClose} disabled={loading}>
+                Cancel
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<SaveOutlined />}
+                loading={loading}
+              >
+                {isEditMode ? 'Update' : 'Create'} Product
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </Spin>
     </Modal>
   );
 };
