@@ -21,7 +21,6 @@ class ProductAPIView(APIView):
         """Get all products for the user"""
         try:
             user = request.user
-            logger.debug(f"Fetching products for user: {user.username}")
 
             # Get store config for additional metadata
             try:
@@ -29,10 +28,11 @@ class ProductAPIView(APIView):
                 store_name = store_config.store_name
             except StoreConfig.DoesNotExist:
                 store_name = "My Store"
-                logger.warning(f"No StoreConfig found for user: {user.username}")
 
-            products = Product.objects.filter(user=user).order_by('-id')
-            serializer = ProductSerializer(products, many=True)
+            products = Product.objects.filter(user=user).prefetch_related('categories').order_by('-id')
+            print("products", products) 
+            serializer = ProductSerializer(products, many=True, context={'request': request})
+            print("serializer.data", serializer.data)
 
             return Response({
                 'products': serializer.data,
@@ -51,9 +51,8 @@ class ProductAPIView(APIView):
         """Create a new product"""
         try:
             user = request.user
-            logger.debug(f"Creating product for user: {user.username}")
-
             data = request.data
+            print("data", data)
 
             # Validate required fields
             required_fields = ['name', 'price']
@@ -129,10 +128,10 @@ class ProductAPIView(APIView):
                 description=data.get('description', ''),
                 price=price,
                 original_price=original_price,
-                image=data.get('image', ''),
+                image = request.FILES.get('image', None),
                 rating=rating,
                 reviews_count=reviews_count,
-                is_available=data.get('inStock', True),
+                is_available=str(data.get('inStock', 'true')).lower() in ['true', '1', 'yes'],
                 badge=data.get('badge', None)
             )
 

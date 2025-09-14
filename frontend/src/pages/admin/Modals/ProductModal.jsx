@@ -76,26 +76,49 @@ const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode, loading 
   }, [product, isEditMode, form, isOpen]);
 
   const handleSubmit = (values) => {
-    const imageUrl = fileList[0]?.url || fileList[0]?.response?.url || '';
-    const formData = {
-      ...values,
-      image: imageUrl,
-      categories: values.categories || [],
-    };
-    onSubmit(formData, isEditMode ? product.id : null);
-  };
+  const formData = new FormData();
+  formData.append("name", values.name);
+  formData.append("description", values.description);
+  formData.append("price", values.price);
+  formData.append("originalPrice", values.originalPrice || "");
+  formData.append("rating", values.rating || 0);
+  formData.append("reviews", values.reviews || 0);
+  formData.append("inStock", values.inStock);
+  formData.append("badge", values.badge || "");
+  values.categories.forEach((cat) => formData.append("categories", cat));
+
+  if (fileList.length > 0 && fileList[0].originFileObj) {
+    formData.append("image", fileList[0].originFileObj); // 👈 actual file
+  }
+
+  onSubmit(formData, isEditMode ? product.id : null);
+};
+
 
   const handleImageChange = ({ fileList: newFileList }) => {
     setFileList(newFileList);
   };
 
-  const beforeUpload = (file) => {
-    const isLt2M = file.size / 1024 / 1024 < 2;
-    if (!isLt2M) {
-      message.error('Image must be smaller than 2MB!');
-    }
-    return isLt2M;
-  };
+ const beforeUpload = (file) => {
+  const isAllowedType =
+    file.type === "image/jpeg" ||
+    file.type === "image/jpg" ||
+    file.type === "image/png";
+
+  if (!isAllowedType) {
+    message.error("Only JPG/PNG files are allowed!");
+    return Upload.LIST_IGNORE; // prevent invalid files
+  }
+
+  const isLt2M = file.size / 1024 / 1024 < 2;
+  if (!isLt2M) {
+    message.error("Image must be smaller than 2MB!");
+    return Upload.LIST_IGNORE;
+  }
+
+  return true;
+};
+
 
   return (
     <Modal
@@ -213,8 +236,9 @@ const ProductModal = ({ isOpen, onClose, onSubmit, product, isDarkMode, loading 
                   listType="picture"
                   fileList={fileList}
                   onChange={handleImageChange}
-                  // beforeUpload={beforeUpload}
+                  beforeUpload={() => false} 
                   maxCount={1}
+                  accept="image/jpeg,image/jpg,image/png"
                 >
                   <Button icon={<UploadOutlined />}>
                     Upload Image

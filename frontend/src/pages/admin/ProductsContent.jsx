@@ -13,41 +13,39 @@ const ProductsContent = ({ isDarkMode }) => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
 
-  // Fetch products on mount
+  // Fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
         const response = await api.get('/api/products/');
-        setProducts(response.data.products);
+        console.log('response', response.data);
+
+        setProducts(response.data.products || []);
       } catch (err) {
         message.error(err.response?.data?.error || 'Failed to fetch products');
       } finally {
         setLoading(false);
       }
     };
+
     fetchProducts();
   }, []);
 
-  // Handle adding or editing a product
+  // Save product (create or update)
   const handleSaveProduct = async (formData, productId) => {
     setLoading(true);
     try {
       if (productId) {
-        // Edit product
         const response = await api.put(`/api/products/${productId}/`, formData);
         setProducts((prev) =>
-          prev.map((p) => (p.id === productId ? { ...p, ...formData } : p))
+          prev.map((p) => (p.id === productId ? response.data : p))
         );
-        message.success(response.data.message || 'Product updated successfully');
+        message.success('Product updated successfully');
       } else {
-        // Add product
         const response = await api.post('/api/products/', formData);
-        setProducts((prev) => [
-          ...prev,
-          { id: response.data.product_id, ...formData },
-        ]);
-        message.success(response.data.message || 'Product created successfully');
+        setProducts((prev) => [...prev, response.data]);
+        message.success('Product created successfully');
       }
     } catch (err) {
       message.error(err.response?.data?.error || 'Failed to save product');
@@ -57,21 +55,14 @@ const ProductsContent = ({ isDarkMode }) => {
     }
   };
 
-  // Handle delete confirmation
-  const showDeleteConfirm = (product) => {
-    setProductToDelete(product);
-    setDeleteModalVisible(true);
-  };
-
-  // Handle deleting a product
+  // Delete product
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
-    
     setLoading(true);
     try {
-      const response = await api.delete(`/api/products/${productToDelete.id}/`);
+      await api.delete(`/api/products/${productToDelete.id}/`);
       setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
-      message.success(response.data.message || 'Product deleted successfully');
+      message.success('Product deleted successfully');
     } catch (err) {
       message.error(err.response?.data?.error || 'Failed to delete product');
     } finally {
@@ -81,37 +72,16 @@ const ProductsContent = ({ isDarkMode }) => {
     }
   };
 
-  // Open modal for adding
-  const handleAddProduct = () => {
-    setSelectedProduct(null);
-    setIsModalOpen(true);
-  };
-
-  // Open modal for editing
-  const handleEditProduct = (product) => {
-    setSelectedProduct(product);
-    setIsModalOpen(true);
-  };
-
-  // Close modal
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedProduct(null);
-  };
-
-  // Close delete modal
-  const handleCloseDeleteModal = () => {
-    setDeleteModalVisible(false);
-    setProductToDelete(null);
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <h3 className="text-2xl font-bold">Products</h3>
         <button
-          onClick={handleAddProduct}
+          onClick={() => {
+            setSelectedProduct(null);
+            setIsModalOpen(true);
+          }}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
         >
           <Plus className="w-4 h-4" />
@@ -119,14 +89,14 @@ const ProductsContent = ({ isDarkMode }) => {
         </button>
       </div>
 
-      {/* Loading Spinner */}
+      {/* Loading */}
       {loading && (
         <div className="flex justify-center">
           <Spin size="large" />
         </div>
       )}
 
-      {/* Products Table */}
+      {/* Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -135,7 +105,6 @@ const ProductsContent = ({ isDarkMode }) => {
                 <th className="text-left py-3 px-4">Product</th>
                 <th className="text-left py-3 px-4">Category</th>
                 <th className="text-left py-3 px-4">Price</th>
-                <th className="text-left py-3 px-4">Stock</th>
                 <th className="text-left py-3 px-4">Status</th>
                 <th className="text-left py-3 px-4">Sales</th>
                 <th className="text-left py-3 px-4">Actions</th>
@@ -143,40 +112,65 @@ const ProductsContent = ({ isDarkMode }) => {
             </thead>
             <tbody>
               {products.map((product) => (
-                <tr key={product.id} className="border-b border-gray-200 dark:border-gray-700">
+                <tr
+                  key={product.id}
+                  className="border-b border-gray-200 dark:border-gray-700"
+                >
+                  {/* Product Image + Name */}
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
+                      {product.image && (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      )}
                       <span className="font-medium">{product.name}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4">{product.categories?.join(', ') || 'N/A'}</td>
+
+                  {/* Category */}
+                  <td className="py-4 px-4">
+                    {product.category || product.primary_category || 'N/A'}
+                  </td>
+
+                  {/* Price */}
                   <td className="py-4 px-4">{product.price}</td>
-                  <td className="py-4 px-4">{product.inStock ? 'In Stock' : 'Out of Stock'}</td>
+
+                  {/* Status */}
                   <td className="py-4 px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs ${
-                        product.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        product.is_available
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {product.inStock ? 'Active' : 'Out of Stock'}
+                      {product.is_available ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="py-4 px-4">{product.reviews || 0}</td>
+
+                  {/* Sales */}
+                  <td className="py-4 px-4">{product.reviews_count || 0}</td>
+
+                  {/* Actions */}
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleEditProduct(product)}
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setIsModalOpen(true);
+                        }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => showDeleteConfirm(product)}
+                        onClick={() => {
+                          setProductToDelete(product);
+                          setDeleteModalVisible(true);
+                        }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-red-600"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -193,19 +187,22 @@ const ProductsContent = ({ isDarkMode }) => {
       {/* Product Modal */}
       <ProductModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedProduct(null);
+        }}
         onSubmit={handleSaveProduct}
         product={selectedProduct}
         isDarkMode={isDarkMode}
         loading={loading}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       <Modal
         title="Confirm Delete"
         open={deleteModalVisible}
         onOk={handleDeleteProduct}
-        onCancel={handleCloseDeleteModal}
+        onCancel={() => setDeleteModalVisible(false)}
         okText="Delete"
         okType="danger"
         cancelText="Cancel"

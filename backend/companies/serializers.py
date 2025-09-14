@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import StoreConfig, Category, Product, Customer, Order, OrderItem, Payment
+from django.conf import settings
 
 # StoreConfig Serializer
 class StoreConfigSerializer(serializers.ModelSerializer):
@@ -14,24 +15,34 @@ class StoreConfigSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    categories = serializers.SerializerMethodField()
-    category = serializers.SerializerMethodField()
-    
+    categories = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field="name"
+    )
+    primary_category = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'description', 'price',
-            'image', 'rating', 'reviews_count', 'is_available',
-            'badge', 'categories', 'category'
+            "id", "name", "description", "price",
+            "image", "rating", "reviews_count", "is_available",
+            "badge", "categories", "primary_category"
         ]
 
-    def get_categories(self, obj):
-        return [cat.name for cat in obj.categories.all()]
-
-    def get_category(self, obj):
-        categories = [cat.name for cat in obj.categories.all()]
-        return categories[0] if categories else 'Uncategorized'
+    def get_primary_category(self, obj):
+        first_category = obj.categories.first()
+        return first_category.name if first_category else "Uncategorized"
+    
+    def get_image(self, obj):
+        request = self.context.get('request')  # pick up request if passed
+        if obj.image:
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            else:
+                return f"{settings.MEDIA_URL}{obj.image}"
+        return None
 
 
 class CategorySerializer(serializers.ModelSerializer):
